@@ -6,7 +6,12 @@
  * Built as a from-scratch replacement for a Crow-style card, but scoped
  * down to one entity (no multi-device switcher) and extended with:
  *   - Independent volume routing (control a receiver, not the source)
- *   - An Apple TV style remote touchpad (via a `remote.*` entity)
+ *   - A persistent volume slider + optional mute button (always visible,
+ *     not hidden behind an expand tap)
+ *   - The entity's own name/area shown as a subtitle (e.g. "Family Room")
+ *   - A one-tap remote button that jumps straight to an Apple TV style
+ *     remote touchpad (via a `remote.*` entity) - only shown when a
+ *     remote_entity is configured, so plain speakers never show it
  *   - A visual (UI) config editor
  *
  * Install:
@@ -19,9 +24,10 @@
  *   type: custom:glass-media-card
  *   entity: media_player.living_room_apple_tv
  *   volume_entity: media_player.denon_avr        # optional, defaults to `entity`
- *   remote_entity: remote.living_room_apple_tv   # optional, hides Remote tab if omitted
+ *   remote_entity: remote.living_room_apple_tv   # optional, hides remote button if omitted
  *   name: Living Room                            # optional, overrides friendly_name
  *   accent_color: '#0A84FF'                      # optional, iOS blue by default
+ *   show_mute_button: true                       # optional, defaults to true
  *
  * Remote commands are sent via remote.send_command. Different remote
  * integrations expose different command names - check
@@ -29,7 +35,7 @@
  * and adjust REMOTE_COMMANDS below if a button doesn't do what you expect.
  */
 
-const CARD_VERSION = '1.0.0';
+const CARD_VERSION = '1.1.0';
 
 const SUPPORT_PAUSE = 1;
 const SUPPORT_SEEK = 2;
@@ -90,6 +96,7 @@ class GlassMediaCard extends HTMLElement {
     }
     this._config = {
       accent_color: '#0A84FF',
+      show_mute_button: true,
       ...config,
     };
     this._built = false;
@@ -110,7 +117,7 @@ class GlassMediaCard extends HTMLElement {
   }
 
   getCardSize() {
-    return this._expanded ? 6 : 2;
+    return this._expanded ? 7 : 3;
   }
 
   connectedCallback() {
@@ -144,6 +151,7 @@ class GlassMediaCard extends HTMLElement {
             <button class="icon-btn prev" aria-label="Previous">${ICONS.prev}</button>
             <button class="icon-btn play primary" aria-label="Play/Pause">${ICONS.play}</button>
             <button class="icon-btn next" aria-label="Next">${ICONS.next}</button>
+            <button class="icon-btn remote-mini" aria-label="Open remote control">${ICONS.remote}</button>
           </div>
         </div>
 
@@ -179,15 +187,6 @@ class GlassMediaCard extends HTMLElement {
               <button class="icon-btn play lg primary" aria-label="Play/Pause">${ICONS.play}</button>
               <button class="icon-btn next lg" aria-label="Next">${ICONS.next}</button>
             </div>
-
-            <div class="volume-row">
-              <button class="icon-btn mute-btn" aria-label="Mute">${ICONS.volume}</button>
-              <div class="volume-track">
-                <div class="volume-fill"></div>
-                <div class="volume-thumb"></div>
-              </div>
-              <span class="volume-label"></span>
-            </div>
           </div>
 
           <div class="panel panel-remote">
@@ -205,6 +204,16 @@ class GlassMediaCard extends HTMLElement {
             </div>
           </div>
         </div>
+
+        <!-- Persistent volume row: always visible, independent of compact/expanded state -->
+        <div class="volume-row">
+          <button class="icon-btn mute-btn" aria-label="Mute">${ICONS.volume}</button>
+          <div class="volume-track">
+            <div class="volume-fill"></div>
+            <div class="volume-thumb"></div>
+          </div>
+          <span class="volume-label"></span>
+        </div>
       </div>
     `;
 
@@ -218,6 +227,7 @@ class GlassMediaCard extends HTMLElement {
       miniPlay: $('.mini-controls .play'),
       miniPrev: $('.mini-controls .prev'),
       miniNext: $('.mini-controls .next'),
+      miniRemote: $('.mini-controls .remote-mini'),
       expanded: $('.expanded'),
       collapseBtn: $('.collapse-btn'),
       artLg: $('.art-lg'),
@@ -277,6 +287,12 @@ class GlassMediaCard extends HTMLElement {
       ev.stopPropagation();
       this._callService('media_player', 'media_next_track', this._config.entity);
     }));
+
+    e.miniRemote.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      this._setExpanded(true);
+      this._setPanel('remote');
+    });
 
     e.segMedia.addEventListener('click', () => this._setPanel('media'));
     e.segRemote.addEventListener('click', () => this._setPanel('remote'));
@@ -412,6 +428,8 @@ class GlassMediaCard extends HTMLElement {
     const e = this._el;
 
     e.expanded.querySelector('.remote-tab').style.display = this._config.remote_entity ? '' : 'none';
+    e.miniRemote.style.display = this._config.remote_entity ? '' : 'none';
+    e.muteBtn.style.display = this._config.show_mute_button === false ? 'none' : '';
     if (!this._config.remote_entity && this._panel === 'remote') this._setPanel('media');
 
     if (!st) {
@@ -423,8 +441,8 @@ class GlassMediaCard extends HTMLElement {
     }
 
     const name = this._config.name || st.attributes.friendly_name || entity;
-    const title = st.attributes.media_title || name;
-    const subtitle = st.attributes.media_artist || st.attributes.app_name || (st.state === 'playing' ? 'Playing' : this._capitalize(st.state));
+    const title = st.attributes.media_title || this._capitalize(st.state) || name;
+    const subtitle = name;
     const picture = st.attributes.entity_picture || '';
     const playing = st.state === 'playing';
 
@@ -555,6 +573,7 @@ const STYLE = `
   .title { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .subtitle { font-size:12px; color:rgba(235,235,245,.6); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .mini-controls { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .mini-controls .remote-mini { margin-left:6px; background:rgba(255,255,255,.05); }
 
   /* Expanded */
   .expanded { display:none; padding:16px; position:relative; }
@@ -596,7 +615,11 @@ const STYLE = `
 
   .transport-row { display:flex; align-items:center; justify-content:center; gap:28px; margin:6px 0 22px; }
 
-  .volume-row { display:flex; align-items:center; gap:10px; }
+  .volume-row {
+    display:flex; align-items:center; gap:10px;
+    padding:12px 16px 14px;
+    border-top:1px solid rgba(255,255,255,.08);
+  }
   .volume-row .volume-track { flex:1; }
   .volume-label { font-size:10px; color:rgba(235,235,245,.45); max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 
@@ -662,6 +685,8 @@ class GlassMediaCardEditor extends HTMLElement {
         .color-row { display:flex; align-items:center; gap:10px; }
         input[type="color"] { width:44px; height:32px; border:none; background:none; padding:0; cursor:pointer; }
         .hint { font-size:11px; color:var(--secondary-text-color,#888); margin-top:3px; }
+        .checkbox-label { display:flex; align-items:center; gap:8px; font-size:14px; cursor:pointer; }
+        .checkbox-label input { width:16px; height:16px; cursor:pointer; }
       </style>
       <div class="editor">
         <div class="row" id="row-entity">
@@ -686,6 +711,12 @@ class GlassMediaCardEditor extends HTMLElement {
             <span id="accent-hex">${cfg.accent_color || '#0A84FF'}</span>
           </div>
         </div>
+        <div class="row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="show-mute" ${cfg.show_mute_button === false ? '' : 'checked'}>
+            Show mute button
+          </label>
+        </div>
       </div>
     `;
 
@@ -698,6 +729,9 @@ class GlassMediaCardEditor extends HTMLElement {
       accentHex.textContent = accentInput.value;
       this._updateConfig({ accent_color: accentInput.value });
     });
+
+    const muteCheckbox = this.shadowRoot.getElementById('show-mute');
+    muteCheckbox.addEventListener('change', () => this._updateConfig({ show_mute_button: muteCheckbox.checked }));
 
     this._mountPicker('row-entity', 'entity', ['media_player'], true);
     this._mountPicker('row-volume', 'volume_entity', ['media_player'], false);
@@ -740,7 +774,7 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: 'glass-media-card',
   name: 'Glass Media Card',
-  description: 'iOS-inspired glass media card with independent volume routing and an Apple TV remote pad.',
+  description: 'iOS-inspired glass media card with a persistent volume slider, independent volume routing, and a one-tap Apple TV remote pad.',
   preview: true,
 });
 
