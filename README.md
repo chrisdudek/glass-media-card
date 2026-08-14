@@ -7,8 +7,10 @@ Built as a from-scratch, purpose-built alternative to the Crow Media Player Card
 ## Features
 
 - **Compact + expanded views** — a small now-playing row that expands into a full glass panel with large artwork.
+- **Persistent volume control** — a volume slider (and optional mute button) is always visible, right under the compact row, with no need to expand the card first.
 - **Independent volume routing** — control the volume of a *different* entity than the one playing media (e.g. route volume to a Denon/receiver while the Apple TV plays the content).
-- **Apple TV remote pad** — up/down/left/right/select, back, home, and power, sent via `remote.send_command` to a `remote.*` entity.
+- **Entity name shown as subtitle** — the media player's own name/area (e.g. "Family Room") is always visible under the title.
+- **One-tap Apple TV remote** — a remote icon in the compact row jumps straight to a full touchpad (up/down/left/right/select, back, home, power) sent via `remote.send_command`. It only appears when `remote_entity` is configured, so plain speakers (HomePod minis, etc.) never show it.
 - **Visual (UI) config editor** — no YAML required; entities are picked through Home Assistant's standard entity picker.
 - **No external dependencies** — pure vanilla JS web component, system fonts only, works fully offline/on a LAN-only Home Assistant instance.
 
@@ -37,9 +39,10 @@ Add the card through the dashboard UI — search for **Glass Media Card** — an
 type: custom:glass-media-card
 entity: media_player.living_room_apple_tv
 volume_entity: media_player.denon_avr        # optional — defaults to `entity`
-remote_entity: remote.living_room_apple_tv   # optional — omit to hide the Remote tab
+remote_entity: remote.living_room_apple_tv   # optional — omit to hide the remote button entirely
 name: Living Room                            # optional — overrides friendly_name
 accent_color: '#0A84FF'                      # optional — iOS blue by default
+show_mute_button: true                       # optional — defaults to true
 ```
 
 ### Options
@@ -48,9 +51,10 @@ accent_color: '#0A84FF'                      # optional — iOS blue by default
 |---|---|---|---|
 | `entity` | string | Yes | The `media_player` entity to show artwork/title and drive play/pause/prev/next. |
 | `volume_entity` | string | No | A separate entity (typically another `media_player`) whose volume the slider controls. Falls back to `entity`. |
-| `remote_entity` | string | No | A `remote.*` entity used for the remote touchpad. If omitted, the Remote tab is hidden. |
-| `name` | string | No | Overrides the entity's friendly name in the card header. |
+| `remote_entity` | string | No | A `remote.*` entity used for the remote touchpad. If omitted, the remote button (compact row) and Remote tab (expanded view) are both hidden — use this to keep the remote off cards for plain speakers. |
+| `name` | string | No | Overrides the entity's friendly name shown as the subtitle. |
 | `accent_color` | string | No | Hex color used for the progress bar, volume fill, glow effects, and the select button. Defaults to `#0A84FF`. |
+| `show_mute_button` | boolean | No | Shows/hides the mute icon next to the volume slider. Defaults to `true`. |
 
 ### Remote commands
 
